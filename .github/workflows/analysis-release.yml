@@ -1,0 +1,72 @@
+# Release binaries for BobKerns/analysis's video builds.
+#
+# This fork's `analysis` branch is upstream VHS plus image-layer capture
+# (charmbracelet/vhs#783). Upstream's release workflows need Charm's
+# secrets, so they're removed on this branch; this one builds plain binaries
+# and attaches them to a GitHub release.
+#
+# Push a tag like v0.12.1-analysis.1 to release. Archives are named and laid
+# out like upstream's (vhs_<version>_<OS>_<arch>.tar.gz holding
+# vhs_<version>_<OS>_<arch>/vhs), so a download script written for an
+# upstream release works unchanged.
+
+name: analysis-release
+
+on:
+  push:
+    tags:
+      - "v*-analysis.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to (re)build and release"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Unit tests
+        # The integration tests need ttyd and a browser; these don't.
+        run: go test -short ./...
+
+      - name: Build
+        run: |
+          set -eu
+          version="${TAG#v}"
+          sha="$(git rev-parse HEAD)"
+          mkdir -p dist
+          for target in linux/amd64/Linux/x86_64 linux/arm64/Linux/arm64 \
+                        darwin/amd64/Darwin/x86_64 darwin/arm64/Darwin/arm64; do
+            IFS=/ read -r goos goarch os arch <<<"$target"
+            name="vhs_${version}_${os}_${arch}"
+            mkdir -p "dist/$name"
+            CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" go build -trimpath \
+              -ldflags "-s -w -X main.Version=$version -X main.CommitSHA=$sha" \
+              -o "dist/$name/vhs" .
+            cp LICENSE README.md "dist/$name/"
+            tar -C dist -czf "dist/$name.tar.gz" "$name"
+          done
+          (cd dist && sha256sum ./*.tar.gz > checksums.txt)
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" \
+            --title "$TAG" --prerelease \
+            --notes "VHS ${TAG%%-analysis*} plus image-layer capture (charmbracelet/vhs#783), for BobKerns/analysis's videos. Turn it on in a tape with \`Set Sixel true\`."
+          gh release upload "$TAG" dist/*.tar.gz dist/checksums.txt --clobber
