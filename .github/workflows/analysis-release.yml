@@ -5,7 +5,9 @@
 # secrets, so they're removed on this branch; this one builds plain binaries
 # and attaches them to a GitHub release.
 #
-# Push a tag like v0.12.1-analysis.1 to release. Archives are named and laid
+# To release, push a tag like v0.12.1-analysis.1, or run this workflow by
+# hand on the analysis branch with that tag name (it creates the tag on the
+# commit it built, for when a tag can't be pushed). Archives are named and laid
 # out like upstream's (vhs_<version>_<OS>_<arch>.tar.gz holding
 # vhs_<version>_<OS>_<arch>/vhs), so a download script written for an
 # upstream release works unchanged.
@@ -19,7 +21,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing tag to (re)build and release"
+        description: "Tag to release, e.g. v0.12.1-analysis.1 (created on this commit if new)"
         required: true
 
 permissions:
@@ -32,8 +34,6 @@ jobs:
       TAG: ${{ inputs.tag || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ env.TAG }}
 
       - uses: actions/setup-go@v5
         with:
@@ -67,6 +67,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" \
-            --title "$TAG" --prerelease \
+            --target "$(git rev-parse HEAD)" --title "$TAG" --prerelease \
             --notes "VHS ${TAG%%-analysis*} plus image-layer capture (charmbracelet/vhs#783), for BobKerns/analysis's videos. Turn it on in a tape with \`Set Sixel true\`."
           gh release upload "$TAG" dist/*.tar.gz dist/checksums.txt --clobber
