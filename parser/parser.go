@@ -513,7 +513,7 @@ func (p *Parser) parseSet() Command {
 				)
 			}
 		}
-	case token.CURSOR_BLINK, token.SIXEL:
+	case token.CURSOR_BLINK, token.SIXEL, token.REAL_TIME:
 		cmd.Args = p.peek.Literal
 		p.nextToken()
 

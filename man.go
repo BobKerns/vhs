@@ -77,6 +77,7 @@ The following is a list of all possible setting commands in VHS:
 * Set %Padding% <number>
 * Set %Framerate% <number>
 * Set %Sixel% <boolean> (default false; capture sixel images)
+* Set %RealTime% <boolean> (default false; hold a late frame so the video keeps real time)
 * Set %PlaybackSpeed% <float>
 * Set %WaitTimeout% <time>
 * Set %WaitPattern% <regexp>
