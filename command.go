@@ -485,6 +485,7 @@ var Settings = map[string]CommandFunc{
 	"WaitTimeout":   ExecuteSetWaitTimeout,
 	"CursorBlink":   ExecuteSetCursorBlink,
 	"Sixel":         ExecuteSetSixel,
+	"RealTime":      ExecuteSetRealTime,
 }
 
 // ExecuteSet applies the settings on the running vhs specified by the
@@ -806,6 +807,18 @@ func ExecuteSetSixel(c parser.Command, v *VHS) error {
 	}
 	v.Options.Video.Sixel = enabled
 	v.Options.Screenshot.sixel = enabled
+	return nil
+}
+
+// ExecuteSetRealTime makes the video keep real time: a frame captured late
+// is held (repeated) for the frames it missed, instead of the video playing
+// fast from there on.
+func ExecuteSetRealTime(c parser.Command, v *VHS) error {
+	enabled, err := strconv.ParseBool(c.Args)
+	if err != nil {
+		return fmt.Errorf("failed to parse real time: %w", err)
+	}
+	v.Options.Video.RealTime = enabled
 	return nil
 }
 

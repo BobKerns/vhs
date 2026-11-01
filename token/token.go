@@ -110,6 +110,7 @@ const (
 	WAIT_PATTERN    = "WAIT_PATTERN"
 	CURSOR_BLINK    = "CURSOR_BLINK"
 	SIXEL           = "SIXEL"
+	REAL_TIME       = "REAL_TIME"
 )
 
 // Keywords maps keyword strings to tokens.
@@ -171,6 +172,7 @@ var Keywords = map[string]Type{
 	"Source":        SOURCE,
 	"CursorBlink":   CURSOR_BLINK,
 	"Sixel":         SIXEL,
+	"RealTime":      REAL_TIME,
 	"true":          BOOLEAN,
 	"false":         BOOLEAN,
 	"Screenshot":    SCREENSHOT,
@@ -186,7 +188,7 @@ func IsSetting(t Type) bool {
 		FRAMERATE, TYPING_SPEED, THEME, PLAYBACK_SPEED, HEIGHT, WIDTH,
 		ROWS, COLUMNS,
 		PADDING, LOOP_OFFSET, MARGIN_FILL, MARGIN, WINDOW_BAR,
-		WINDOW_BAR_SIZE, BORDER_RADIUS, CURSOR_BLINK, SIXEL, WAIT_TIMEOUT, WAIT_PATTERN:
+		WINDOW_BAR_SIZE, BORDER_RADIUS, CURSOR_BLINK, SIXEL, REAL_TIME, WAIT_TIMEOUT, WAIT_PATTERN:
 		return true
 	default:
 		return false

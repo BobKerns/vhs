@@ -59,6 +59,7 @@ type VideoOptions struct {
 	StartingFrame int
 	Style         *StyleOptions
 	Sixel         bool
+	RealTime      bool
 }
 
 const (

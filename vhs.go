@@ -649,6 +649,8 @@ func (vhs *VHS) Record(ctx context.Context) <-chan error {
 		counter := 0
 		var images imageLayerCapture
 		start := time.Now()
+		clock := newFrameClock(interval, start)
+		var last *frameLayers
 		for {
 			select {
 			case <-ctx.Done():
@@ -656,6 +658,9 @@ func (vhs *VHS) Record(ctx context.Context) <-chan error {
 
 				// Save total # of frames for offset calculation
 				vhs.totalFrames = counter
+				if err := writeTiming(clock.report(vhs.Options.Video.Framerate)); err != nil {
+					log.Print(err.Error())
+				}
 
 				// Signal caller that we're done recording.
 				close(ch)
@@ -664,6 +669,7 @@ func (vhs *VHS) Record(ctx context.Context) <-chan error {
 			case <-time.After(interval - time.Since(start)):
 				// record last attempt
 				start = time.Now()
+				clock.tick(start, vhs.recording && vhs.Page != nil)
 
 				if !vhs.recording {
 					continue
@@ -688,34 +694,24 @@ func (vhs *VHS) Record(ctx context.Context) <-chan error {
 					}
 				}
 
-				counter++
-				if err := os.WriteFile(
-					filepath.Join(vhs.Options.Video.Input, fmt.Sprintf(cursorFrameFormat, counter)),
-					cursor,
-					0o600,
-				); err != nil {
-					ch <- fmt.Errorf("error writing cursor frame: %w", err)
-					continue
-				}
-				if err := os.WriteFile(
-					filepath.Join(vhs.Options.Video.Input, fmt.Sprintf(textFrameFormat, counter)),
-					text,
-					0o600,
-				); err != nil {
-					ch <- fmt.Errorf("error writing text frame: %w", err)
-					continue
-				}
-
-				if vhs.Options.Video.Sixel {
-					if err := os.WriteFile(
-						filepath.Join(vhs.Options.Video.Input, fmt.Sprintf(imageFrameFormat, counter)),
-						image,
-						0o600,
-					); err != nil {
-						ch <- fmt.Errorf("error writing image frame: %w", err)
-						continue
+				// RealTime: this frame is late, so the last one stays up for
+				// the frames this one missed. The screen changed at some point
+				// in that time, but VHS can't know when.
+				for vhs.Options.Video.RealTime && last != nil && clock.missed() > 1 {
+					counter++
+					if err := vhs.writeFrame(counter, last.cursor, last.text, last.image); err != nil {
+						ch <- err
+						break
 					}
+					clock.hold()
 				}
+				counter++
+				if err := vhs.writeFrame(counter, cursor, text, image); err != nil {
+					ch <- err
+					continue
+				}
+				clock.frame()
+				last = &frameLayers{cursor, text, image}
 
 				// Capture current frame and disable frame capturing
 				if vhs.Options.Screenshot.frameCapture {
@@ -726,6 +722,33 @@ func (vhs *VHS) Record(ctx context.Context) <-chan error {
 	}()
 
 	return ch
+}
+
+// frameLayers is one frame's images, kept to hold it while the next is late.
+type frameLayers struct {
+	cursor, text, image []byte
+}
+
+// writeFrame writes one frame's layers under its number.
+func (vhs *VHS) writeFrame(n int, cursor, text, image []byte) error {
+	if err := os.WriteFile(
+		filepath.Join(vhs.Options.Video.Input, fmt.Sprintf(cursorFrameFormat, n)), cursor, 0o600,
+	); err != nil {
+		return fmt.Errorf("error writing cursor frame: %w", err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(vhs.Options.Video.Input, fmt.Sprintf(textFrameFormat, n)), text, 0o600,
+	); err != nil {
+		return fmt.Errorf("error writing text frame: %w", err)
+	}
+	if vhs.Options.Video.Sixel {
+		if err := os.WriteFile(
+			filepath.Join(vhs.Options.Video.Input, fmt.Sprintf(imageFrameFormat, n)), image, 0o600,
+		); err != nil {
+			return fmt.Errorf("error writing image frame: %w", err)
+		}
+	}
+	return nil
 }
 
 // ResumeRecording indicates to VHS that the recording should be resumed.
